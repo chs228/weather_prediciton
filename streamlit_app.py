@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 
 # Function to fetch weather data from OpenWeatherMap API
 def fetch_weather_data(city, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q=vellore&appid=8e053535e539905553c1c736985c5ccf&units=metric"
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api}&units=metric"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
@@ -52,7 +52,7 @@ st.title("Weather Prediction App")
 
 # User input for city
 city = st.text_input("Enter city name:", "Mumbai")
-api_key = "YOUR_API_KEY"
+api_key = "8e053535e539905553c1c736985c5ccf"
 
 # Fetch and display real-time weather data
 if st.button("Get Weather Data"):
