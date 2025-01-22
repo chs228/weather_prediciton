@@ -3,16 +3,21 @@ import pandas as pd
 import numpy as np
 import joblib
 import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, db
 import io
 import os
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error
+
+# --- Firebase Initialization ---
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("path/to/your/firebase-adminsdk.json")  # Replace with your Firebase credentials file
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://weather-prediction-5ef4b-default-rtdb.firebaseio.com'  # Replace with your Firebase Realtime Database URL
+})
 
 # --- API Configuration ---
 API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
 LOCATION = "Vellore,India"
-CSV_FILE = "weather_data.csv"
 
 # --- Fetch Real-Time Weather Data ---
 def fetch_weather():
@@ -25,77 +30,83 @@ def fetch_weather():
         print("Failed to fetch data:", response.text)
         return None
 
-# --- Append Data to CSV ---
-def append_to_csv(new_data):
-    if new_data is None or new_data.empty:
-        print("No new data to append.")
-        return
-    
-    if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
-        try:
-            existing_data = pd.read_csv(CSV_FILE)
-            updated_data = pd.concat([existing_data, new_data], ignore_index=True)
-        except pd.errors.EmptyDataError:
-            print("Warning: Existing CSV file is empty. Writing new data from scratch.")
-            updated_data = new_data
-    else:
-        print("CSV file not found or empty. Creating new file.")
-        updated_data = new_data
-
-    updated_data.to_csv(CSV_FILE, index=False)
-    print("Data updated successfully.")
+# --- Store Data to Firebase Realtime Database ---
+def store_in_realtime_db(new_data):
+    if new_data is not None and not new_data.empty:
+        for _, row in new_data.iterrows():
+            data = row.to_dict()  # Convert each row to a dictionary
+            db.reference('/weather_data').push(data)  # Push data to the Firebase node
 
 # --- Train Prediction Model ---
 def train_model():
-    df = pd.read_csv(CSV_FILE)
+    # Fetch all data from Firebase Realtime Database
+    ref = db.reference('/weather_data')
+    data = ref.get()
+
+    if data is None:
+        print("No data available in Firebase.")
+        return
+
+    # Convert Firebase data into a DataFrame
+    df = pd.DataFrame(data)
+
     features = ["humidity", "windgust", "windspeed"]
     target = "temp"
-    
-    df = df.dropna(subset=features + [target])  
+
+    df = df.dropna(subset=features + [target])  # Remove missing values
     X = df[features]
     y = df[target]
-    
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
+
     model = LinearRegression()
     model.fit(X_train, y_train)
-    
+
     y_pred = model.predict(X_test)
     print("Model Trained - MAE:", mean_absolute_error(y_test, y_pred))
-    
-    joblib.dump(model, "weather_model.pkl")
+
+    joblib.dump(model, "weather_model.pkl")  # Save the model
 
 # --- Streamlit App ---
 def weather_dashboard():
     st.title("🌦️ Vellore Weather Prediction App")
-    
-    if not os.path.exists(CSV_FILE) or os.path.getsize(CSV_FILE) == 0:
-        st.error("No data available. Please fetch data first.")
-        return
+    st.write("This app predicts temperature based on historical weather data.")
 
-    df = pd.read_csv(CSV_FILE)
-    
-    if df.empty or any(col not in df.columns for col in ["humidity", "windgust", "windspeed"]):
-        st.error("Insufficient data for prediction.")
-        return
+    if st.button("Predict Temperature"):
+        # Load trained model
+        model = joblib.load("weather_model.pkl")
+        
+        # Use historical data from Firebase to train and predict
+        ref = db.reference('/weather_data')
+        data = ref.get()
 
-    # Use the most recent row for prediction
-    latest_data = df[["humidity", "windgust", "windspeed"]].iloc[-1:].values
+        if data is None:
+            st.write("No historical data available for prediction.")
+            return
 
-    model = joblib.load("weather_model.pkl")
-    prediction = model.predict(latest_data)
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.write("No data to make predictions.")
+            return
+        
+        # Get the latest available data for prediction
+        latest_data = df.iloc[-1]  # You can change this to select other data points
+        humidity = latest_data['humidity']
+        windgust = latest_data['windgust']
+        windspeed = latest_data['windspeed']
+        
+        # Prepare the input data for prediction
+        input_data = np.array([[humidity, windgust, windspeed]])
+        
+        # Make prediction
+        prediction = model.predict(input_data)
+        st.write(f"Predicted Temperature: {prediction[0]:.2f}°C")
 
-    st.subheader("Latest Weather Data")
-    st.write(df.iloc[-1])  # Display latest row
-
-    st.subheader("Predicted Temperature")
-    st.write(f"🌡️ {prediction[0]:.2f}°C")
-
-# --- Run Data Fetching, Training, and Streamlit ---
+# --- Main Execution ---
 if __name__ == "__main__":
     new_data = fetch_weather()
     if new_data is not None:
-        append_to_csv(new_data)
-        train_model()
-    
-    weather_dashboard()
+        store_in_realtime_db(new_data)  # Store the new data in Firebase
+        train_model()  # Train the model using the Firebase data
+
+    weather_dashboard()  # Display Streamlit dashboard
