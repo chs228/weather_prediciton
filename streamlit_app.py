@@ -2,13 +2,12 @@ import requests
 import pandas as pd
 import numpy as np
 import joblib
-import time
 import streamlit as st
+import io
+import os
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error
-import io  # Import io module for StringIO
-import os
 
 # --- API Configuration ---
 API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
@@ -17,10 +16,6 @@ CSV_FILE = "weather_data.csv"
 
 # --- Fetch Real-Time Weather Data ---
 def fetch_weather():
-    API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
-    LOCATION = "Vellore,India"
-    CSV_FILE = "weather_data.csv"
-
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
@@ -36,7 +31,6 @@ def append_to_csv(new_data):
         print("No new data to append.")
         return
     
-    # Check if file exists and is not empty
     if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
         try:
             existing_data = pd.read_csv(CSV_FILE)
@@ -48,16 +42,16 @@ def append_to_csv(new_data):
         print("CSV file not found or empty. Creating new file.")
         updated_data = new_data
 
-    # Save the updated data
     updated_data.to_csv(CSV_FILE, index=False)
     print("Data updated successfully.")
+
 # --- Train Prediction Model ---
 def train_model():
     df = pd.read_csv(CSV_FILE)
     features = ["humidity", "windgust", "windspeed"]
     target = "temp"
     
-    df = df.dropna(subset=features + [target])  # Remove missing values
+    df = df.dropna(subset=features + [target])  
     X = df[features]
     y = df[target]
     
@@ -69,22 +63,33 @@ def train_model():
     y_pred = model.predict(X_test)
     print("Model Trained - MAE:", mean_absolute_error(y_test, y_pred))
     
-    joblib.dump(model, "weather_model.pkl")  # Save the model
+    joblib.dump(model, "weather_model.pkl")
 
 # --- Streamlit App ---
 def weather_dashboard():
     st.title("🌦️ Vellore Weather Prediction App")
-    st.write("Enter weather conditions to predict the temperature:")
+    
+    if not os.path.exists(CSV_FILE) or os.path.getsize(CSV_FILE) == 0:
+        st.error("No data available. Please fetch data first.")
+        return
 
-    humidity = st.number_input("Humidity (%)", min_value=0, max_value=100, value=50)
-    windgust = st.number_input("Wind Gust (km/h)", min_value=0.0, max_value=100.0, value=10.0)
-    windspeed = st.number_input("Wind Speed (km/h)", min_value=0.0, max_value=100.0, value=5.0)
+    df = pd.read_csv(CSV_FILE)
+    
+    if df.empty or any(col not in df.columns for col in ["humidity", "windgust", "windspeed"]):
+        st.error("Insufficient data for prediction.")
+        return
 
-    if st.button("Predict Temperature"):
-        model = joblib.load("weather_model.pkl")
-        input_data = np.array([[humidity, windgust, windspeed]])
-        prediction = model.predict(input_data)
-        st.write(f"Predicted Temperature: {prediction[0]:.2f}°C")
+    # Use the most recent row for prediction
+    latest_data = df[["humidity", "windgust", "windspeed"]].iloc[-1:].values
+
+    model = joblib.load("weather_model.pkl")
+    prediction = model.predict(latest_data)
+
+    st.subheader("Latest Weather Data")
+    st.write(df.iloc[-1])  # Display latest row
+
+    st.subheader("Predicted Temperature")
+    st.write(f"🌡️ {prediction[0]:.2f}°C")
 
 # --- Run Data Fetching, Training, and Streamlit ---
 if __name__ == "__main__":
