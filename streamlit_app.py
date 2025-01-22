@@ -10,7 +10,7 @@ import os
 
 # --- Firebase Initialization ---
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate("path/to/your/firebase-adminsdk.json")  # Replace with your Firebase credentials file
+cred = credentials.Certificate("firebase-adminsdk.json")  # Replace with your Firebase credentials file
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://weather-prediction-5ef4b-default-rtdb.firebaseio.com'  # Replace with your Firebase Realtime Database URL
 })
