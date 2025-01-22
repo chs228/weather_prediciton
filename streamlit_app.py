@@ -1,83 +1,80 @@
-import streamlit as st
 import requests
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import joblib
+import time
+import streamlit as st
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error
 
-# Function to fetch weather data from OpenWeatherMap API
-def fetch_weather_data(city, api_key):
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+# --- API Configuration ---
+API_KEY = "7b16d48ea0289bcf0cf8300c1a3b41ab"  # Replace with your Visual Crossing API Key
+LOCATION = "Vellore,India"
+CSV_FILE = "weather_data.csv"
+
+# --- Fetch Real-Time Weather Data ---
+def fetch_weather():
+    url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}/today?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
-        data = response.json()
-        return {
-            "Temperature": data["main"]["temp"],
-            "Humidity": data["main"]["humidity"],
-            "Pressure": data["main"]["pressure"],
-            "Description": data["weather"][0]["description"],
-        }
+        new_data = pd.read_csv(pd.compat.StringIO(response.text))
+        return new_data
     else:
+        print("Failed to fetch data:", response.text)
         return None
 
-# Simulated dataset for training the ML model (replace with real historical data if available)
-def generate_sample_data():
-    np.random.seed(42)
-    temperatures = np.random.uniform(15, 40, 1000)
-    humidity = np.random.uniform(20, 80, 1000)
-    pressure = np.random.uniform(1000, 1025, 1000)
-    target_temp = temperatures + np.random.normal(0, 1, 1000)  # Adding some noise
+# --- Append Data to CSV ---
+def append_to_csv(new_data):
+    try:
+        existing_data = pd.read_csv(CSV_FILE)
+        updated_data = pd.concat([existing_data, new_data], ignore_index=True)
+    except FileNotFoundError:
+        updated_data = new_data
 
-    data = pd.DataFrame({
-        "Temperature": temperatures,
-        "Humidity": humidity,
-        "Pressure": pressure,
-        "TargetTemp": target_temp,
-    })
-    return data
+    updated_data.to_csv(CSV_FILE, index=False)
+    print("Data updated successfully.")
 
-# Train ML model
-def train_model(data):
-    X = data[["Humidity", "Pressure"]]
-    y = data["TargetTemp"]
-
+# --- Train Prediction Model ---
+def train_model():
+    df = pd.read_csv(CSV_FILE)
+    features = ["humidity", "windgust", "windspeed"]
+    target = "temp"
+    
+    df = df.dropna(subset=features + [target])  # Remove missing values
+    X = df[features]
+    y = df[target]
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
     model = LinearRegression()
     model.fit(X_train, y_train)
+    
+    y_pred = model.predict(X_test)
+    print("Model Trained - MAE:", mean_absolute_error(y_test, y_pred))
+    
+    joblib.dump(model, "weather_model.pkl")  # Save the model
 
-    return model
+# --- Streamlit App ---
+def weather_dashboard():
+    st.title("🌦️ Vellore Weather Prediction App")
+    st.write("Enter weather conditions to predict the temperature:")
 
-# Streamlit app
-st.title("Weather Prediction App")
+    humidity = st.number_input("Humidity (%)", min_value=0, max_value=100, value=50)
+    windgust = st.number_input("Wind Gust (km/h)", min_value=0.0, max_value=100.0, value=10.0)
+    windspeed = st.number_input("Wind Speed (km/h)", min_value=0.0, max_value=100.0, value=5.0)
 
-# User input for city
-city = st.text_input("Enter city name:", "Mumbai")
-api_key = "7b16d48ea0289bcf0cf8300c1a3b41ab"
+    if st.button("Predict Temperature"):
+        model = joblib.load("weather_model.pkl")
+        input_data = np.array([[humidity, windgust, windspeed]])
+        prediction = model.predict(input_data)
+        st.write(f"Predicted Temperature: {prediction[0]:.2f}°C")
 
-# Fetch and display real-time weather data
-if st.button("Get Weather Data"):
-    weather_data = fetch_weather_data(city, api_key)
-    if weather_data:
-        st.write(f"### Current Weather in {city}")
-        st.write(f"- Temperature: {weather_data['Temperature']} °C")
-        st.write(f"- Humidity: {weather_data['Humidity']} %")
-        st.write(f"- Pressure: {weather_data['Pressure']} hPa")
-        st.write(f"- Description: {weather_data['Description']}")
-    else:
-        st.error("Failed to fetch weather data. Please check the city name or your API key.")
-
-# ML-based temperature prediction
-st.write("---")
-st.write("### Predict Future Temperature")
-
-# User input for prediction features
-humidity = st.slider("Humidity (%)", 0, 100, 50)
-pressure = st.slider("Pressure (hPa)", 950, 1050, 1013)
-
-# Train the model and make a prediction
-data = generate_sample_data()
-model = train_model(data)
-
-if st.button("Predict Temperature"):
-    prediction = model.predict([[humidity, pressure]])[0]
-    st.write(f"### Predicted Temperature: {prediction:.2f} °C")
+# --- Run Data Fetching, Training, and Streamlit ---
+if __name__ == "__main__":
+    new_data = fetch_weather()
+    if new_data is not None:
+        append_to_csv(new_data)
+        train_model()
+    
+    weather_dashboard()
