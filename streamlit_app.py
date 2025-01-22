@@ -7,13 +7,17 @@ import firebase_admin
 from firebase_admin import credentials, db
 import io
 import os
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error
 
 # --- Firebase Initialization ---
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate("firebase-adminsdk.json")  # Replace with your Firebase credentials file
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://weather-prediction-5ef4b-default-rtdb.firebaseio.com'  # Replace with your Firebase Realtime Database URL
-})
+# Initialize Firebase Admin SDK only if it's not already initialized
+if not firebase_admin._apps:
+    cred = credentials.Certificate("firebase-adminsdk.json")  # Replace with your Firebase credentials file
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://weather-prediction-5ef4b-default-rtdb.firebaseio.com'  # Replace with your Firebase Realtime Database URL
+    })
 
 # --- API Configuration ---
 API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
