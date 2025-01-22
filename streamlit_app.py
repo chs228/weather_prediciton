@@ -15,8 +15,10 @@ CSV_FILE = "weather_data.csv"
 
 # --- Fetch Real-Time Weather Data ---
 def fetch_weather():
-API_KEY = "YOUR_API_KEY"  # Replace with your API key
-LOCATION = "Vellore,India"
+    API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
+    LOCATION = "Vellore,India"
+    CSV_FILE = "weather_data.csv"
+
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
