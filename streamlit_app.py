@@ -12,7 +12,7 @@ import io
 # --- API Configuration ---
 API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
 LOCATION = "Vellore,India"
-CSV_FILE = "weather_data.csv"
+CSV_FILE = "weather-prediction.csv"
 
 # --- Fetch Real-Time Weather Data ---
 def fetch_weather():
