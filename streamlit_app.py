@@ -9,13 +9,15 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error
 
 # --- API Configuration ---
-API_KEY = "7b16d48ea0289bcf0cf8300c1a3b41ab"  # Replace with your Visual Crossing API Key
+API_KEY = "SK3M2MX6SE39DM7JJA2P2HZAU"  # Replace with your Visual Crossing API Key
 LOCATION = "Vellore,India"
 CSV_FILE = "weather_data.csv"
 
 # --- Fetch Real-Time Weather Data ---
 def fetch_weather():
-    url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}/today?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
+API_KEY = "YOUR_API_KEY"  # Replace with your API key
+LOCATION = "Vellore,India"
+    url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
         new_data = pd.read_csv(pd.compat.StringIO(response.text))
