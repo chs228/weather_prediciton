@@ -22,7 +22,7 @@ def fetch_weather():
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{LOCATION}?unitGroup=metric&contentType=csv&include=days&key={API_KEY}"
     response = requests.get(url)
     if response.status_code == 200:
-        new_data = pd.read_csv(pd.compat.StringIO(response.text))
+        new_data = pd.read_csv(io.StringIO(response.text))
         return new_data
     else:
         print("Failed to fetch data:", response.text)
