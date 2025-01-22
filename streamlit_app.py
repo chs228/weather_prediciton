@@ -31,15 +31,25 @@ def fetch_weather():
 
 # --- Append Data to CSV ---
 def append_to_csv(new_data):
-    try:
-        existing_data = pd.read_csv(CSV_FILE)
-        updated_data = pd.concat([existing_data, new_data], ignore_index=True)
-    except FileNotFoundError:
+    if new_data is None or new_data.empty:
+        print("No new data to append.")
+        return
+    
+    # Check if file exists and is not empty
+    if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
+        try:
+            existing_data = pd.read_csv(CSV_FILE)
+            updated_data = pd.concat([existing_data, new_data], ignore_index=True)
+        except pd.errors.EmptyDataError:
+            print("Warning: Existing CSV file is empty. Writing new data from scratch.")
+            updated_data = new_data
+    else:
+        print("CSV file not found or empty. Creating new file.")
         updated_data = new_data
 
+    # Save the updated data
     updated_data.to_csv(CSV_FILE, index=False)
     print("Data updated successfully.")
-
 # --- Train Prediction Model ---
 def train_model():
     df = pd.read_csv(CSV_FILE)
